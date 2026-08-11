@@ -1,7 +1,9 @@
+// System Analogy: Loading network interface modules and cryptographic libraries into memory.
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 
+// Inspection Rule: Verify that our security keys exist before opening network ports.
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const PORT = process.env.PORT || 3000;
@@ -12,9 +14,14 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
+// Creating our application router instance (the digital security gatehouse).
 const app = express();
+
+// Middleware to parse incoming JSON network payloads (like firewall packet inspection).
 app.use(express.json());
 
+// System Analogy: Establishing an encrypted API bridge to our cloud RADIUS/Identity Provider server.
+// We use the safe public 'anon' key here—never the service_role key.
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Basic ping route to verify the guard tower server is alive and reachable.
@@ -25,6 +32,10 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// ==============================================================================
+// STAGE 1: OPEN AUTH (SIGN UP & LOG IN)
+// ==============================================================================
 
 /**
  * POST /auth/signup
@@ -94,6 +105,49 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
+// ==============================================================================
+// STAGE 2: THE PUBLIC & PROTECTED GATES
+// ==============================================================================
+
+/**
+ * GET /public/info
+ * Publicly accessible endpoint requiring no authentication tokens.
+ * Systems Analogy: Building reception lobby open to the public.
+ */
+app.get('/public/info', (req, res) => {
+  return res.status(200).json({
+    message: 'Welcome stranger! This info is public.'
+  });
+});
+
+/**
+ * GET /protected/profile
+ * Protected endpoint requiring an Authorization header (Bearer token).
+ * Systems Analogy: Turnstile gate checking if a visitor ID badge is presented.
+ */
+app.get('/protected/profile', (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  // Inspection Rule: Verify presence of "Authorization: Bearer <token>"
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  // Extract the token string from behind "Bearer "
+  const token = authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  // Stage 2 Checkpoint: Token string is present (verification added in Stage 3)
+  return res.status(200).json({
+    message: 'Welcome authorized user! Token received.',
+    token: token
+  });
+});
+
+// Binding the application to listen for HTTP requests on TCP Port 3000.
 app.listen(PORT, () => {
   console.log('=======================================================');
   console.log(`🚀 Server running on port ${PORT} and connected to Supabase`);
