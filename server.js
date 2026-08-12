@@ -89,19 +89,23 @@ app.post('/auth/login', async (req, res) => {
 });
 
 // ==============================================================================
-// STAGE 2 & STAGE 3: PUBLIC & PROTECTED GATES WITH TOKEN VERIFICATION
+// STAGE 4: REUSABLE AUTH MIDDLEWARE GUARD
 // ==============================================================================
 
-app.get('/public/info', (req, res) => {
-  return res.status(200).json({
-    message: 'Welcome stranger! This info is public.'
-  });
-});
-
-app.get('/protected/profile', async (req, res) => {
+/**
+ * REUSABLE MIDDLEWARE GUARD (requireAuth)
+ * 
+ * Network Analogy: Instead of placing a security guard inside every single office room 
+ * in a building, you place a single, highly trained security guard at the main security 
+ * checkpoint before the elevator bank.
+ * 
+ * If a request passes this guard, it gets tagged with `req.user` and allowed into the room (`next()`).
+ * If the pass is missing, forged, or expired, the guard turns them away (`HTTP 401`).
+ */
+async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
 
-  // Step 1: Perimeter Inspection — Ensure "Authorization: Bearer <token>" is present
+  // Step 1: Perimeter Check — Ensure "Authorization: Bearer <token>" is present
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Access token required' });
   }
@@ -113,23 +117,62 @@ app.get('/protected/profile', async (req, res) => {
   }
 
   try {
-    // Step 2 & 3: Systems Analogy — Scanner at the entrance calling central HQ
-    // (Supabase Auth) to verify if the digital visitor badge is authentic or forged.
+    // Step 2: Verify badge authenticity directly with central Identity Provider (Supabase)
     const { data, error } = await supabase.auth.getUser(token);
 
-    // Step 3: If token is expired, tampered with, or invalid -> turn away forgeries
     if (error || !data.user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    // Step 4: Token is authentic -> return 200 with user safe metadata
-    return res.status(200).json({
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        created_at: data.user.created_at
-      }
-    });
+    // Step 3: Attach verified identity to request object for downstream routes
+    req.user = data.user;
+
+    // Step 4: Open gate and allow request to proceed to route handler
+    next();
+  } catch (err) {
+    return res.status(500).json({ error: 'Internal server authentication error' });
+  }
+}
+
+// ==============================================================================
+// STAGE 2, 3 & 4: PUBLIC & PROTECTED ROUTES
+// ==============================================================================
+
+app.get('/public/info', (req, res) => {
+  return res.status(200).json({
+    message: 'Welcome stranger! This info is public.'
+  });
+});
+
+app.get('/protected/profile', requireAuth, (req, res) => {
+  // Notice how clean this route body is! The guard already validated req.user.
+  return res.status(200).json({
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      created_at: req.user.created_at
+    }
+  });
+});
+
+app.get('/protected/dashboard', requireAuth, (req, res) => {
+  return res.status(200).json({
+    message: `Welcome to the secure SME operational dashboard, ${req.user.email}!`,
+    status: 'Active Session'
+  });
+});
+
+app.post('/auth/logout', requireAuth, async (req, res) => {
+  try {
+    // Revoke session in Supabase Auth
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    // Return 204 No Content as required by REST API standard for logout
+    return res.status(204).send();
   } catch (err) {
     return res.status(500).json({ error: 'Internal server authentication error' });
   }
