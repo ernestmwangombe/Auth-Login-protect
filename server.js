@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const swaggerUi = require('swagger-ui-express');
+const openapiDocument = require('./openapi.json');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -16,6 +18,9 @@ const app = express();
 
 // Middleware: Firewall packet inspection parsing incoming JSON payloads
 app.use(express.json());
+
+// Stage 5: Serve Swagger UI Documentation at /docs
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiDocument));
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
