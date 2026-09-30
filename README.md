@@ -22,8 +22,7 @@ Audit-Ready Operations: Unverified or forged tokens are immediately rejected wit
 
 1. Clone the Repository
 
-git clone https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/ernestmwangombe/Auth-Login-protect
 
 
 2. Install Dependencies
